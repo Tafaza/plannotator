@@ -1504,8 +1504,17 @@ export default function plannotator(pi: ExtensionAPI, deps: PlannotatorExtension
 	pi.registerCommand("plannotator-review", {
 		description: "Open interactive code review for current changes, a directory, or a PR URL; pass --git or --gitbutler to force that provider, --base <ref> / --diff-type <type> to pin the session's opening diff",
 		handler: async (args, ctx) => {
-			const launched = await launchCodeReview(ctx, args ?? "");
-			if (!launched.ok) ctx.ui.notify(launched.error, "error");
+			// Keep VCS discovery and large diffs off Pi's command dispatcher.
+			currentPiSession.update(ctx);
+			const origin = getPiSessionIdentity(ctx);
+			ctx.ui.notify("Preparing code review…", "info");
+			void launchCodeReview(ctx, args ?? "")
+				.then((launched) => {
+					if (!launched.ok) safeNotify(ctx, launched.error, "error", origin);
+				})
+				.catch((err) => {
+					reportBackgroundError(ctx, "Failed to start code review UI", err, origin);
+				});
 		},
 	});
 
